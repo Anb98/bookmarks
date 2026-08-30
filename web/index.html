@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-theme="{{.DefaultTheme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>bookmarks</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <span class="wordmark">~/bookmarks</span>
+    <span class="stats" id="stats" aria-live="polite">0 ENTRIES / 0 TAGS</span>
+    <div class="topbar-spacer"></div>
+    <input type="file" id="import-input" class="visually-hidden" accept=".json,.html,.htm">
+    <button type="button" class="btn-ghost" id="import-btn">IMPORT</button>
+    <button type="button" class="btn-ghost" id="export-btn">EXPORT</button>
+    <button type="button" class="btn-ghost" id="theme-toggle">DARK</button>
+    <button type="button" class="btn btn-new" id="new-btn">
+      <svg class="icon-plus" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L6 10.5 M1.5 6 L10.5 6"></path></svg>
+      NEW
+    </button>
+  </header>
+
+  <div class="search-row">
+    <span class="prompt" aria-hidden="true">&gt;</span>
+    <input type="text" class="search-input" id="search-input" placeholder="search title, url, note, tag" aria-label="search bookmarks">
+    <span class="result-count" id="result-count">0 RESULTS</span>
+  </div>
+
+  <section class="tag-band" id="tag-band">
+    <div class="tag-band-open" id="tag-band-open">
+      <div class="tag-band-head">
+        <span class="tag-band-label" id="tag-band-label">ALL 0 TAGS</span>
+        <span class="tag-band-divider" aria-hidden="true"></span>
+        <button type="button" class="tag-band-clear" id="tag-clear" hidden>CLEAR</button>
+        <button type="button" class="tag-band-toggle" id="tag-hide">HIDE</button>
+      </div>
+      <div class="tag-cloud" id="tag-cloud"></div>
+    </div>
+    <button type="button" class="tag-band-collapsed" id="tag-band-collapsed" hidden aria-expanded="false" aria-controls="tag-band-open">
+      <span class="tag-band-label">TAGS</span>
+      <span class="tag-band-summary" id="tag-band-summary">0 tags, none active</span>
+      <span class="tag-band-toggle" id="tag-show">SHOW ALL</span>
+    </button>
+  </section>
+
+  <div class="content" id="content">
+    <div class="grid-area">
+      <main class="grid" id="grid"></main>
+      <div class="empty-state" id="empty-state" hidden>
+        <div class="empty-zero">0 results</div>
+        <p class="empty-body" id="empty-body"></p>
+      </div>
+    </div>
+
+    <aside class="drawer" id="drawer" hidden aria-label="bookmark editor">
+      <div class="drawer-header">
+        <span class="drawer-title" id="drawer-title">NEW ENTRY</span>
+        <button type="button" class="drawer-close" id="drawer-close" aria-label="close editor">
+          <svg viewBox="0 0 11 11" aria-hidden="true"><path d="M1 1 L10 10 M10 1 L1 10"></path></svg>
+        </button>
+      </div>
+      <div class="drawer-body" id="drawer-body">
+        <div class="field">
+          <label for="field-url">url</label>
+          <input type="text" id="field-url" placeholder="https://">
+        </div>
+        <div class="field">
+          <label for="field-title">title</label>
+          <input type="text" id="field-title" placeholder="page title">
+        </div>
+        <div class="field">
+          <label for="field-description">description</label>
+          <input type="text" id="field-description" placeholder="why keep it">
+        </div>
+        <p class="metadata-notice" id="metadata-notice" hidden></p>
+        <div class="field">
+          <label for="field-tag-input">tags</label>
+          <div class="tag-cluster" id="tag-cluster">
+            <div class="token-box" id="token-box">
+              <input type="text" class="tag-input" id="field-tag-input" placeholder="type to search or create">
+            </div>
+            <div class="suggestions" id="suggestions">
+              <div class="suggestions-head">
+                <span class="suggestions-label" id="suggestions-label">MOST USED</span>
+                <span class="suggestions-divider" aria-hidden="true"></span>
+              </div>
+              <div class="suggestions-list" id="suggestions-list"></div>
+            </div>
+          </div>
+        </div>
+        <p class="save-error" id="save-error" hidden></p>
+      </div>
+      <div class="drawer-footer">
+        <button type="button" class="btn btn-save" id="save-btn">SAVE ENTRY</button>
+        <button type="button" class="btn-danger" id="delete-btn" hidden>DELETE ENTRY</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+</div>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>

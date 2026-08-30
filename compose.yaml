@@ -1,0 +1,29 @@
+services:
+  bookmarks:
+    build: .
+    image: bookmarks
+    container_name: bookmarks
+    restart: unless-stopped
+
+    ports:
+      - "${BOOKMARKS_PORT:-8080}:8080"
+
+    # Must match the owner of ./data on the host, or SQLite cannot write there.
+    # Find yours with: id -u and id -g
+    user: "${UID:-1000}:${GID:-1000}"
+
+    # The database lives here. This bind mount is required, not optional:
+    # without it the container has no writable /data and will exit at startup.
+    volumes:
+      - ./data:/data
+
+    environment:
+      BOOKMARKS_ADDR: ":8080"
+      BOOKMARKS_DB: "/data/bookmarks.db"
+      BOOKMARKS_THEME: "dark"
+      BOOKMARKS_ALLOW_PRIVATE_NET: "false"
+      BOOKMARKS_FETCH_TIMEOUT: "8s"
+      BOOKMARKS_MAX_FETCH_BYTES: "1048576"
+      BOOKMARKS_MAX_FAVICON_BYTES: "65536"
+      BOOKMARKS_MAX_IMPORT_BYTES: "33554432"
+      BOOKMARKS_USER_AGENT: "Mozilla/5.0 (compatible; bookmarks/1.0)"

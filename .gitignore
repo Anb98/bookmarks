@@ -1,0 +1,5 @@
+# Local runtime state: the live SQLite database and its WAL.
+data/
+
+# Machine-specific UID/GID/port; README documents how to generate it.
+.env
