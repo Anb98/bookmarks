@@ -34,6 +34,24 @@ docker compose up -d
 
 Get this wrong and the container exits at startup saying it cannot open the database. That is deliberate: the alternative is running as root and leaving root-owned files on your host that you then cannot read without `sudo`.
 
+### Running the published image
+
+Every push to `main` publishes a multi-arch image (`linux/amd64` and `linux/arm64`) to GitHub Container Registry, so you can skip the build entirely. The `ENTRYPOINT`, port and `/data` volume are the same ones compose wires up, and `:latest` follows `main` — pin the commit tag `ghcr.io/anb98/bookmarks:<sha>` if you would rather choose when to move.
+
+```bash
+mkdir -p data
+docker pull ghcr.io/anb98/bookmarks:latest
+docker run -d --name bookmarks --restart unless-stopped \
+  -p 8080:8080 \
+  -u "$(id -u):$(id -g)" \
+  -v "$PWD/data:/data" \
+  -e BOOKMARKS_ADDR=":8080" \
+  -e BOOKMARKS_DB="/data/bookmarks.db" \
+  ghcr.io/anb98/bookmarks:latest
+```
+
+GHCR creates the package as private on its first publish, so it has to be made public once in the repository's package settings before an unauthenticated `docker pull` will work.
+
 ## Configuration
 
 Every setting is an environment variable, and the app starts with none of them set.

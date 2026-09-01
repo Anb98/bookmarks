@@ -1,4 +1,4 @@
-FROM golang:1.27-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 
 RUN apk add --no-cache ca-certificates
 
@@ -6,7 +6,13 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /bookmarks .
+
+# Both dependencies are pure Go, so the compiler can target another
+# architecture on its own. Cross-compiling on the runner's native toolchain
+# is far faster than emulating a foreign toolchain under QEMU. Declared here,
+# after the copy, so a change of target does not invalidate the layers above.
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /bookmarks .
 
 FROM scratch
 
