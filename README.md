@@ -1,6 +1,6 @@
 # Bookmarks
 
-A self-hosted bookmarks manager in a single 5.5 MB static binary. Paste a URL and the server fetches the page to fill in the title, description and favicon; find anything again by live search or by combining tags. All data lives in one SQLite file on your host.
+A self-hosted bookmarks manager in a single 12 MB static binary. Paste a URL and the server fetches the page to fill in the title, description and favicon; find anything again by live search or by combining tags. All data lives in one SQLite file on your host.
 
 ![Bookmarks](docs/desktop-light.png)
 
@@ -175,7 +175,7 @@ Two dependencies: `modernc.org/sqlite` (pure Go, so the binary is genuinely stat
 
 The frontend is native ES modules under `web/js/`, plus `web/index.html` and `web/app.css` — no build step, no npm, no framework. Everything, fonts included, is embedded with `go:embed`, so the app makes no external requests to render.
 
-The `scratch` base is what keeps the image at 5.5 MB; `python:3.13-alpine` starts at 70.3 MB and `node:24-alpine` at 234 MB before any application code. Measure with `docker image inspect --format '{{.Size}}'` — `docker images` reports inflated numbers for this image.
+The `scratch` base is what keeps the image at 12 MB on disk; `python:3.13-alpine` starts at 47.6 MB and `node:24-alpine` at 170 MB before a line of application code. All three were measured the same way, `docker export <container> | wc -c` on `linux/amd64`, so they compare like with like. Pulling costs less than the on-disk figure — 5.5 MB compressed for this image. Two commands to avoid: `docker images` reports inflated numbers, and `docker image inspect --format '{{.Size}}'` reports the compressed size rather than the size on disk.
 
 ## License
 
