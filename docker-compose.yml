@@ -1,7 +1,9 @@
 services:
   bookmarks:
-    build: .
-    image: bookmarks
+    # Pulled from GHCR, published by .github/workflows/docker.yml on every push
+    # to main. To run your own build instead, build it under this same name:
+    #   docker build -t ghcr.io/anb98/bookmarks:latest .
+    image: ghcr.io/anb98/bookmarks:latest
     container_name: bookmarks
     restart: unless-stopped
 

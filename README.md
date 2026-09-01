@@ -8,10 +8,10 @@ No authentication, by design. This is built for a machine you control on a netwo
 
 ```bash
 mkdir -p data
-docker compose up -d --build
+docker compose up -d
 ```
 
-Open <http://localhost:8080>.
+That pulls the published multi-arch image (`linux/amd64` and `linux/arm64`) from GitHub Container Registry — nothing is compiled on your machine. Open <http://localhost:8080>.
 
 To verify it worked:
 
@@ -24,7 +24,7 @@ Change the published port with `BOOKMARKS_PORT=9000 docker compose up -d`.
 
 ### The one thing that trips people up
 
-The container writes SQLite to a bind-mounted directory, so its user has to be able to write there. `compose.yaml` defaults to `1000:1000`. If your account is not uid 1000:
+The container writes SQLite to a bind-mounted directory, so its user has to be able to write there. `docker-compose.yml` defaults to `1000:1000`. If your account is not uid 1000:
 
 ```bash
 echo "UID=$(id -u)" >> .env
@@ -34,23 +34,16 @@ docker compose up -d
 
 Get this wrong and the container exits at startup saying it cannot open the database. That is deliberate: the alternative is running as root and leaving root-owned files on your host that you then cannot read without `sudo`.
 
-### Running the published image
+### Building it yourself
 
-Every push to `main` publishes a multi-arch image (`linux/amd64` and `linux/arm64`) to GitHub Container Registry, so you can skip the build entirely. The `ENTRYPOINT`, port and `/data` volume are the same ones compose wires up, and `:latest` follows `main` — pin the commit tag `ghcr.io/anb98/bookmarks:<sha>` if you would rather choose when to move.
+Compose consumes the published image, so there is no build context in `docker-compose.yml`. To run your own build, tag it with the name compose already expects and it will be used instead of the registry copy:
 
 ```bash
-mkdir -p data
-docker pull ghcr.io/anb98/bookmarks:latest
-docker run -d --name bookmarks --restart unless-stopped \
-  -p 8080:8080 \
-  -u "$(id -u):$(id -g)" \
-  -v "$PWD/data:/data" \
-  -e BOOKMARKS_ADDR=":8080" \
-  -e BOOKMARKS_DB="/data/bookmarks.db" \
-  ghcr.io/anb98/bookmarks:latest
+docker build -t ghcr.io/anb98/bookmarks:latest .
+docker compose up -d
 ```
 
-GHCR creates the package as private on its first publish, so it has to be made public once in the repository's package settings before an unauthenticated `docker pull` will work.
+To go back to the published image, `docker compose pull` overwrites that tag again. `:latest` follows `main`; pin the commit tag `ghcr.io/anb98/bookmarks:<sha>` in `docker-compose.yml` if you would rather choose when to move.
 
 ## Configuration
 
