@@ -15,6 +15,7 @@ export function load() {
   const params = new URLSearchParams();
   if (state.q) params.set('q', state.q);
   if (state.activeTags.size) params.set('tags', Array.from(state.activeTags).join(','));
+  if (state.sort !== 'recent') params.set('sort', state.sort);
 
   return listBookmarks(params, controller.signal)
     .then(function (res) {

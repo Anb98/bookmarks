@@ -26,3 +26,13 @@ export function deleteBookmark(id) {
 export function postImport(body) {
   return fetch('/api/import', { method: 'POST', body: body });
 }
+
+// Fire-and-forget: the browser is opening the bookmark in another tab at the
+// same moment, so sendBeacon is the only send that is guaranteed to survive
+// that. fetch() is the fallback for browsers without it; neither is awaited
+// and a failure costs one uncounted visit.
+export function recordVisit(id) {
+  const path = '/api/bookmarks/' + id + '/visit';
+  if (navigator.sendBeacon && navigator.sendBeacon(path)) return;
+  fetch(path, { method: 'POST', keepalive: true }).catch(function () {});
+}

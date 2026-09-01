@@ -15,8 +15,12 @@
     <span class="stats" id="stats" aria-live="polite">0 ENTRIES / 0 TAGS</span>
     <div class="topbar-spacer"></div>
     <input type="file" id="import-input" class="visually-hidden" accept=".json,.html,.htm">
-    <button type="button" class="btn-ghost" id="import-btn">IMPORT</button>
-    <button type="button" class="btn-ghost" id="export-btn">EXPORT</button>
+    <button type="button" class="btn-ghost btn-icon" id="import-btn" aria-label="import bookmarks" title="import">
+      <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5 L7 9 M4 6 L7 9 L10 6 M2 12 L12 12"></path></svg>
+    </button>
+    <button type="button" class="btn-ghost btn-icon" id="export-btn" aria-label="export bookmarks" title="export">
+      <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 9 L7 1.5 M4 4.5 L7 1.5 L10 4.5 M2 12 L12 12"></path></svg>
+    </button>
     <button type="button" class="btn-ghost" id="theme-toggle">DARK</button>
     <button type="button" class="btn btn-new" id="new-btn">
       <svg class="icon-plus" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 L6 10.5 M1.5 6 L10.5 6"></path></svg>
@@ -27,6 +31,12 @@
   <div class="search-row">
     <span class="prompt" aria-hidden="true">&gt;</span>
     <input type="text" class="search-input" id="search-input" placeholder="search title, url, note, tag" aria-label="search bookmarks">
+    <select class="sort-select" id="sort-select" aria-label="sort bookmarks by">
+      <option value="recent">NEWEST</option>
+      <option value="oldest">OLDEST</option>
+      <option value="title">A – Z</option>
+      <option value="used">MOST USED</option>
+    </select>
     <span class="result-count" id="result-count">0 RESULTS</span>
   </div>
 

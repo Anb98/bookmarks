@@ -42,6 +42,22 @@ function toggleTheme() {
   updateThemeToggleLabel();
 }
 
+// ---------- sort ----------
+
+const SORT_KEY = 'bookmarks-sort';
+
+function initSort() {
+  const select = qs('sort-select');
+  const stored = safeGet(SORT_KEY);
+  // Only adopt a stored value the current markup still offers, so a key left
+  // over from an older build falls back to the default instead of selecting
+  // nothing and rendering a blank control.
+  if (stored && select.querySelector('option[value="' + stored + '"]')) {
+    state.sort = stored;
+  }
+  select.value = state.sort;
+}
+
 // ---------- visual viewport (keyboard-aware sheet height) ----------
 
 function updateVVH() {
@@ -100,6 +116,7 @@ function init() {
   });
 
   initTheme();
+  initSort();
   updateVVH();
   renderTagBandChrome();
 
@@ -111,6 +128,12 @@ function init() {
   qs('search-input').addEventListener('input', function (e) {
     state.q = e.target.value;
     debouncedLoad();
+  });
+
+  qs('sort-select').addEventListener('change', function (e) {
+    state.sort = e.target.value;
+    safeSet(SORT_KEY, state.sort);
+    load();
   });
 
   qs('tag-hide').addEventListener('click', function () {

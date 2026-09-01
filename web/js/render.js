@@ -2,6 +2,7 @@ import { qs } from './dom.js';
 import { state } from './state.js';
 import { toggleTag } from './list.js';
 import { openDrawerForEdit } from './drawer.js';
+import { recordVisit } from './api.js';
 
 // ---------- rendering ----------
 
@@ -126,6 +127,13 @@ function createCard(bm) {
     return t;
   }
 
+  function makeDescription() {
+    const d = document.createElement('p');
+    d.className = 'card-description';
+    d.textContent = bm.description;
+    return d;
+  }
+
   // The card is a real anchor at every width, so middle-click, ctrl-click and
   // "open in new tab" all work. Interactive controls (tag chips, edit) are
   // siblings of the link, never descendants: a button inside an anchor is
@@ -135,6 +143,13 @@ function createCard(bm) {
   link.href = bm.url;
   link.target = '_blank';
   link.rel = 'noreferrer';
+  // Counts the open rather than the position in the list, so the "most used"
+  // sort reflects what actually gets clicked. Middle-click and ctrl-click both
+  // raise auxclick, not click, so they would otherwise never be counted.
+  link.addEventListener('click', function () { recordVisit(bm.id); });
+  link.addEventListener('auxclick', function (e) {
+    if (e.button === 1) recordVisit(bm.id);
+  });
 
   const tagsWrap = document.createElement('div');
   tagsWrap.className = 'card-tags';
@@ -160,6 +175,7 @@ function createCard(bm) {
     main.className = 'card-row-main';
     main.appendChild(makeTitle());
     main.appendChild(makeDomain());
+    main.appendChild(makeDescription());
     main.appendChild(tagsWrap);
     link.appendChild(main);
     root.appendChild(link);
@@ -170,10 +186,7 @@ function createCard(bm) {
     head.appendChild(makeDomain());
     link.appendChild(head);
     link.appendChild(makeTitle());
-    const desc = document.createElement('p');
-    desc.className = 'card-description';
-    desc.textContent = bm.description;
-    link.appendChild(desc);
+    link.appendChild(makeDescription());
     root.appendChild(link);
     root.appendChild(tagsWrap);
   }

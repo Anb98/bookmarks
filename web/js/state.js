@@ -11,6 +11,7 @@ export function isWide() {
 
 export const state = {
   q: '',
+  sort: 'recent',
   activeTags: new Set(),
   bookmarks: [],
   tags: [],

@@ -78,7 +78,11 @@
   --text-tag-chip: #4A423C;
   --text-faint: #A29B92;
   --text-placeholder: #A69F96;
-  --text-tag-low: #9C948B;
+  /* Was #9C948B: 2.99:1 against the band's white surface, and the ramp gives
+     these same tags the smallest size (11px). Least-used tags were paying
+     twice and came out unreadable. #6B635B is 5.90:1 and still visibly
+     quieter than the mid tier's 8.28:1, so the ramp survives. */
+  --text-tag-low: #6B635B;
   --text-monogram: #6F6760;
 
   --border-hairline: rgba(28,25,23,0.07);
@@ -87,13 +91,19 @@
   --border-monogram: rgba(28,25,23,0.14);
   --border-card-hover: rgba(28,25,23,0.22);
   --border-chip-hover: rgba(28,25,23,0.30);
+  /* Every other border here is a hairline under 1.6:1 against the page. That
+     reads as texture, not as an edge, which is fine for a passive field and
+     wrong for a control you are meant to click. This is the one border that
+     has to announce itself; 3:1 would need roughly alpha 0.55 and a line that
+     heavy abandons the hairline language the rest of the design is built on. */
+  --border-control: rgba(28,25,23,0.34);
 
-  --radius-card: 18px;
+  --radius-card: 12px;
   --radius-control: 10px;
   --radius-monogram: 8px;
   --radius-tokenbox: 12px;
-  --card-pad: 18px;
-  --card-minh: 168px;
+  --card-pad: 11px;
+  --card-minh: 140px;
   --grid-gap: 14px;
   --grid-pad: 22px 22px 32px;
   --shadow-card: 0 1px 2px rgba(28,25,23,0.06), 0 10px 26px -16px rgba(28,25,23,0.34);
@@ -124,7 +134,7 @@
   --text-tag-chip: #BDC7D3;
   --text-faint: #5A6473;
   --text-placeholder: #616C7C;
-  --text-tag-low: #6E7887;
+  --text-tag-low: #7B8797;
   --text-monogram: #93A0B0;
 
   --border-hairline: #232830;
@@ -134,13 +144,14 @@
   --border-monogram: #333B46;
   --border-card-hover: #3E4753;
   --border-chip-hover: #4C5665;
+  --border-control: #5A6473;
 
-  --radius-card: 12px;
+  --radius-card: 9px;
   --radius-control: 8px;
   --radius-monogram: 6px;
   --radius-tokenbox: 10px;
   --card-pad: 14px;
-  --card-minh: 152px;
+  --card-minh: 130px;
   --grid-gap: 14px;
   --grid-pad: 20px 22px 30px;
   --shadow-card: none;
@@ -218,7 +229,7 @@ img { display: block; }
 .btn-ghost {
   padding: 8px 10px;
   background: transparent;
-  border: 1px solid var(--border-field);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-control);
   font-size: 10px;
   font-weight: 700;
@@ -226,6 +237,27 @@ img { display: block; }
   color: var(--text-label);
   transition: border-color 120ms ease, color 120ms ease;
 }
+/* Square target, no label: the accessible name now lives only in aria-label,
+   so the markup must carry one. */
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--text-label);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 120ms ease;
+}
+.btn-icon:hover svg { stroke: var(--text); }
 .btn-ghost:hover {
   color: var(--text);
   border-color: var(--border-chip-hover);
@@ -260,6 +292,13 @@ img { display: block; }
   }
 }
 
+@media (max-width: 639px) {
+  /* Same reasoning one row down: the sort control needs width the fixed-height
+     search row does not have at phone width, and the count is the least
+     load-bearing thing in it — the grid below already shows what matched. */
+  .result-count { display: none; }
+}
+
 /* ---------- search row ---------- */
 
 .search-row {
@@ -286,10 +325,31 @@ img { display: block; }
   min-width: 0;
 }
 .search-input::placeholder { color: var(--text-placeholder); }
+.sort-select {
+  flex-shrink: 0;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-label);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.sort-select:hover { color: var(--text); border-color: var(--border-chip-hover); }
+/* The popup is drawn by the OS, not by this stylesheet, so its own background
+   has to be set or a dark theme renders dark text on a dark list. */
+.sort-select option { background: var(--surface); color: var(--text); }
 .result-count {
   font-size: 10px;
   letter-spacing: 0.12em;
-  color: var(--text-faint);
+  /* Measured: --text-faint is 2.42:1 on the light page and 3.05:1 on the dark
+     one. At 10px that is unreadable in both, not just in light. --text-quiet
+     is 5.18:1 and 7.14:1. */
+  color: var(--text-quiet);
   white-space: nowrap;
 }
 
@@ -445,7 +505,15 @@ img { display: block; }
      slack to spare: a ring that lands exactly on the boundary still loses its
      antialiased edge on real displays. */
   scroll-padding: 10px;
-  grid-template-columns: repeat(1, 1fr);
+  /* minmax(0, ...), not a bare 1fr. A bare 1fr means minmax(auto, 1fr), and
+     that auto floors every track at the widest card's min-content width.
+     .card-domain is white-space:nowrap, so its min-content is the whole domain
+     string: one long host made its column ~14px wider than its siblings and,
+     once several long hosts landed in different columns, the tracks overran
+     the grid's content box and the right-hand card spilled past the viewport.
+     A 0 minimum makes every column an exactly equal share and lets the
+     ellipsis already on .card-domain do the job it is there for. */
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: var(--grid-gap);
   padding: var(--grid-pad);
   align-content: start;
@@ -458,13 +526,13 @@ img { display: block; }
 .grid::-webkit-scrollbar-thumb { background: var(--border-field); }
 
 @media (min-width: 640px) {
-  .grid { grid-template-columns: repeat(2, 1fr); }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1024px) {
-  .grid { grid-template-columns: repeat(4, 1fr); }
+  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 1280px) {
-  .grid { grid-template-columns: repeat(5, 1fr); }
+  .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .content.drawer-open .grid { grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); }
 }
 
@@ -515,6 +583,12 @@ img { display: block; }
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* The edit button is absolutely positioned over the card's top-right corner
+     and this row is the only one that reaches into that band, so it has to
+     reserve the space itself. Without this a long domain runs under the pencil
+     instead of ellipsizing before it. Wider than the 30px button by design:
+     the ellipsis needs to land clear of the glyph, not against it. */
+  padding-right: 30px;
 }
 .card-favicon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 .card-monogram {
@@ -550,10 +624,18 @@ img { display: block; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* A bookmark with no title renders its url here, and a url is one unbroken
+     token: without this it overflows the card and is sliced mid-string with
+     no ellipsis instead of wrapping into the two clamped lines. */
+  overflow-wrap: anywhere;
 }
 a.card-title:hover { text-decoration: underline; }
 .card-description {
-  flex: 1;
+  /* Not flex:1. Growing this box past its two clamped lines left it taller
+     than the text it clips, so overflow:hidden revealed the top few pixels of
+     line three under the ellipsis. .card-link already grows, so the tags stay
+     pinned to the bottom of the card without stretching this. */
+  flex: 0 1 auto;
   font-family: var(--font-head);
   font-size: 12px;
   line-height: 1.5;
@@ -563,7 +645,14 @@ a.card-title:hover { text-decoration: underline; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
+/* Plenty of entries have no description. The empty <p> is still a flex item,
+   so it contributes its parent's gap as dead space above the tags. */
+.card-description:empty { display: none; }
+/* Tighter than the desktop stack: the row already spends its height on the
+   title and the domain, and .card-row-main's own 3px gap is the rhythm here. */
+.card-row .card-description { margin-top: 2px; }
 /* Neither theme artboard contains an edit affordance, so this is an addition.
    It exists only below 1024px, where the whole row is already the link to the
    bookmark and there is no other place to put a second target. Above that the
@@ -650,7 +739,6 @@ button.card-tag-chip:hover { color: var(--text); border-color: var(--border-chip
   }
   .card-row .card-title { -webkit-line-clamp: 2; }
   .card-row .card-tags { margin-top: 3px; }
-  .card-description { display: none; }
 }
 
 /* ---------- drawer & scrim ---------- */
