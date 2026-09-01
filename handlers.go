@@ -85,6 +85,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/bookmarks", a.handleCreateBookmark)
 	mux.HandleFunc("PUT /api/bookmarks/{id}", a.handleUpdateBookmark)
 	mux.HandleFunc("DELETE /api/bookmarks/{id}", a.handleDeleteBookmark)
+	mux.HandleFunc("POST /api/bookmarks/{id}/visit", a.handleRecordVisit)
 	mux.HandleFunc("POST /api/metadata", a.handleMetadata)
 	mux.HandleFunc("GET /api/favicon/{domain}", a.handleFavicon)
 	mux.HandleFunc("GET /api/export", a.handleExport)
@@ -154,7 +155,7 @@ func (a *App) handleListBookmarks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	bms, err := listBookmarks(a.db, q, tags)
+	bms, err := listBookmarks(a.db, q, tags, r.URL.Query().Get("sort"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -177,6 +178,23 @@ func (a *App) handleListBookmarks(w http.ResponseWriter, r *http.Request) {
 		TotalBookmarks: total,
 		TotalTags:      len(allTags),
 	})
+}
+
+// handleRecordVisit backs the "most used" sort. It answers 204 for anything
+// that parses, including an id that no longer exists: the client is a
+// fire-and-forget beacon sent while the browser opens the bookmark in another
+// tab, so it cannot read a status or retry.
+func (a *App) handleRecordVisit(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := recordVisit(a.db, id); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type bookmarkRequest struct {

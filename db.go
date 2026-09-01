@@ -10,7 +10,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 const schemaV1 = `
 CREATE TABLE bookmarks (
@@ -36,6 +36,14 @@ CREATE TABLE favicons (
   domain TEXT PRIMARY KEY, mime TEXT NOT NULL, etag TEXT NOT NULL,
   bytes BLOB NOT NULL, fetched_at INTEGER NOT NULL
 ) WITHOUT ROWID;
+`
+
+// schemaV2 adds the visit counter behind the "most used" sort. It is bumped by
+// a beacon the card fires on open, so it is advisory: a count lost to a closed
+// tab or a blocked beacon only reorders one row.
+const schemaV2 = `
+ALTER TABLE bookmarks ADD COLUMN visit_count INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX bookmarks_visits_idx ON bookmarks(visit_count DESC, created_at DESC);
 `
 
 // Bookmark is the shape returned by list/read operations and JSON responses.
@@ -97,6 +105,11 @@ func migrate(db *sql.DB) error {
 	return withTx(db, func(tx *sql.Tx) error {
 		if version < 1 {
 			if _, err := tx.Exec(schemaV1); err != nil {
+				return err
+			}
+		}
+		if version < 2 {
+			if _, err := tx.Exec(schemaV2); err != nil {
 				return err
 			}
 		}
@@ -275,6 +288,14 @@ func deleteBookmark(db *sql.DB, id int64) (found bool, err error) {
 	return found, err
 }
 
+// recordVisit bumps the advisory counter behind the "most used" sort. A
+// missing id is not an error: the beacon races deletion and there is nothing
+// the caller could do about it anyway.
+func recordVisit(db *sql.DB, id int64) error {
+	_, err := db.Exec(`UPDATE bookmarks SET visit_count = visit_count + 1 WHERE id = ?`, id)
+	return err
+}
+
 func countBookmarks(db *sql.DB) (int, error) {
 	var n int
 	err := db.QueryRow(`SELECT COUNT(*) FROM bookmarks`).Scan(&n)
@@ -319,11 +340,35 @@ const searchPredicate = `(b.search_text LIKE ? OR EXISTS (
 		SELECT 1 FROM bookmark_tags sbt JOIN tags st ON st.id = sbt.tag_id
 		WHERE sbt.bookmark_id = b.id AND st.name LIKE ?))`
 
+// sortOrders is a closed whitelist: the value reaches SQL by string
+// substitution, so an unknown key must never fall through to the query.
+// "title" orders by what the card actually prints, which is the url whenever
+// the title is empty.
+var sortOrders = map[string]string{
+	"recent": "b.created_at DESC, b.id DESC",
+	"oldest": "b.created_at ASC, b.id ASC",
+	"title":  "(CASE WHEN b.title = '' THEN b.url ELSE b.title END) COLLATE NOCASE ASC, b.id DESC",
+	"used":   "b.visit_count DESC, b.created_at DESC, b.id DESC",
+}
+
+const defaultSort = "recent"
+
+// orderClause resolves a sort key, falling back to the default for anything
+// unrecognized rather than erroring: a stale key in someone's localStorage
+// should render a list, not a 400.
+func orderClause(sort string) string {
+	if clause, ok := sortOrders[sort]; ok {
+		return clause
+	}
+	return sortOrders[defaultSort]
+}
+
 // listBookmarks applies AND tag-filter semantics plus the search predicate.
 // Zero selected tags omits both joins and the HAVING clause entirely: keeping
 // them would silently drop every untagged bookmark.
-func listBookmarks(db *sql.DB, q string, tags []string) ([]Bookmark, error) {
+func listBookmarks(db *sql.DB, q string, tags []string, sort string) ([]Bookmark, error) {
 	pattern := "%" + strings.ToLower(q) + "%"
+	order := orderClause(sort)
 
 	var rows *sql.Rows
 	var err error
@@ -332,7 +377,7 @@ func listBookmarks(db *sql.DB, q string, tags []string) ([]Bookmark, error) {
 			SELECT b.id, b.url, b.title, b.description, b.domain, b.created_at, %s
 			FROM bookmarks b
 			WHERE %s
-			ORDER BY b.created_at DESC, b.id DESC`, tagListColumns, searchPredicate), pattern, pattern)
+			ORDER BY %s`, tagListColumns, searchPredicate, order), pattern, pattern)
 	} else {
 		placeholders := make([]string, len(tags))
 		args := make([]any, 0, len(tags)+3)
@@ -349,7 +394,7 @@ func listBookmarks(db *sql.DB, q string, tags []string) ([]Bookmark, error) {
 			WHERE t.name IN (%s) AND %s
 			GROUP BY b.id
 			HAVING COUNT(DISTINCT t.id) = ?
-			ORDER BY b.created_at DESC, b.id DESC`, tagListColumns, strings.Join(placeholders, ","), searchPredicate)
+			ORDER BY %s`, tagListColumns, strings.Join(placeholders, ","), searchPredicate, order)
 		rows, err = db.Query(query, args...)
 	}
 	if err != nil {

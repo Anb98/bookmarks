@@ -95,7 +95,7 @@ func TestImportJSONCreatesThenFillsAndUnionsTags(t *testing.T) {
 		t.Fatalf("expected 1 updated (title/desc filled, tag unioned), got %+v", res2)
 	}
 
-	rows, err := listBookmarks(db, "", nil)
+	rows, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestImportJSONMalformedRejectsWholesale(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected malformed JSON to be rejected")
 	}
-	rows, err := listBookmarks(db, "", nil)
+	rows, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestImportNetscapeHTMLFixture(t *testing.T) {
 		t.Fatalf("expected 2 created rows, got %+v", res)
 	}
 
-	rows, err := listBookmarks(db, "", nil)
+	rows, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestImportNetscapeHTMLMalformedRejectsWholesale(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected invalid-UTF-8 payload to be rejected as malformed")
 	}
-	rows, err := listBookmarks(db, "", nil)
+	rows, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}

@@ -47,7 +47,7 @@ type exportDoc struct {
 // stored domain, and base64-inlining them would bloat a text-diffable file
 // roughly 100x. The .db file is the byte-exact backup artifact.
 func exportJSON(db *sql.DB, now time.Time) ([]byte, error) {
-	rows, err := listBookmarks(db, "", nil)
+	rows, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		return nil, err
 	}

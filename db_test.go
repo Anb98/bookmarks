@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -76,8 +77,8 @@ func TestOpenDBCreatesSchema(t *testing.T) {
 	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if version != 1 {
-		t.Errorf("user_version = %d, want 1", version)
+	if version != schemaVersion {
+		t.Errorf("user_version = %d, want %d", version, schemaVersion)
 	}
 }
 
@@ -145,7 +146,7 @@ func TestListBookmarksTagFiltering(t *testing.T) {
 		t.Fatalf("insert c: %v", err)
 	}
 
-	all, err := listBookmarks(db, "", nil)
+	all, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		t.Fatalf("list all: %v", err)
 	}
@@ -165,7 +166,7 @@ func TestListBookmarksTagFiltering(t *testing.T) {
 		t.Error("untagged bookmark missing from unfiltered list")
 	}
 
-	oneTag, err := listBookmarks(db, "", []string{"web"})
+	oneTag, err := listBookmarks(db, "", []string{"web"}, "")
 	if err != nil {
 		t.Fatalf("list one tag: %v", err)
 	}
@@ -173,7 +174,7 @@ func TestListBookmarksTagFiltering(t *testing.T) {
 		t.Fatalf("filtering by 'web' should return only %d, got %v", idTagged, oneTag)
 	}
 
-	twoTags, err := listBookmarks(db, "", []string{"go", "web"})
+	twoTags, err := listBookmarks(db, "", []string{"go", "web"}, "")
 	if err != nil {
 		t.Fatalf("list two tags: %v", err)
 	}
@@ -184,7 +185,7 @@ func TestListBookmarksTagFiltering(t *testing.T) {
 		t.Fatal("idPartial unused sanity check")
 	}
 
-	threeTags, err := listBookmarks(db, "", []string{"go", "web", "nonexistent"})
+	threeTags, err := listBookmarks(db, "", []string{"go", "web", "nonexistent"}, "")
 	if err != nil {
 		t.Fatalf("list three tags: %v", err)
 	}
@@ -192,7 +193,7 @@ func TestListBookmarksTagFiltering(t *testing.T) {
 		t.Fatalf("filtering by a tag nobody has should return zero rows, got %v", threeTags)
 	}
 
-	combined, err := listBookmarks(db, "a.example", []string{"go", "web"})
+	combined, err := listBookmarks(db, "a.example", []string{"go", "web"}, "")
 	if err != nil {
 		t.Fatalf("list combined: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestListBookmarksTagFiltering(t *testing.T) {
 		t.Fatalf("tag+query combined should return only %d, got %v", idTagged, combined)
 	}
 
-	noMatch, err := listBookmarks(db, "b.example", []string{"web"})
+	noMatch, err := listBookmarks(db, "b.example", []string{"web"}, "")
 	if err != nil {
 		t.Fatalf("list no match: %v", err)
 	}
@@ -225,7 +226,7 @@ func TestUpdateBookmark(t *testing.T) {
 		t.Fatalf("expected found=true conflict=false, got found=%v conflict=%v", found, conflict)
 	}
 
-	rows, err := listBookmarks(db, "", nil)
+	rows, err := listBookmarks(db, "", nil, "")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -523,7 +524,7 @@ func TestListBookmarksSearchMatchesTagNames(t *testing.T) {
 	}
 
 	// The tag is the ONLY place this term appears: not in url, title, or description.
-	got, err := listBookmarks(db, "devops", nil)
+	got, err := listBookmarks(db, "devops", nil, "")
 	if err != nil {
 		t.Fatalf("listBookmarks: %v", err)
 	}
@@ -534,7 +535,7 @@ func TestListBookmarksSearchMatchesTagNames(t *testing.T) {
 		t.Fatalf("search by tag name matched the wrong bookmark: %s", got[0].URL)
 	}
 
-	partial, err := listBookmarks(db, "kube", nil)
+	partial, err := listBookmarks(db, "kube", nil, "")
 	if err != nil {
 		t.Fatalf("listBookmarks partial: %v", err)
 	}
@@ -542,7 +543,7 @@ func TestListBookmarksSearchMatchesTagNames(t *testing.T) {
 		t.Fatalf("partial tag match: got %d results, want 1", len(partial))
 	}
 
-	combined, err := listBookmarks(db, "devops", []string{"kubernetes"})
+	combined, err := listBookmarks(db, "devops", []string{"kubernetes"}, "")
 	if err != nil {
 		t.Fatalf("listBookmarks combined: %v", err)
 	}
@@ -550,11 +551,82 @@ func TestListBookmarksSearchMatchesTagNames(t *testing.T) {
 		t.Fatalf("tag search combined with tag filter: got %d, want 1", len(combined))
 	}
 
-	none, err := listBookmarks(db, "devops", []string{"design"})
+	none, err := listBookmarks(db, "devops", []string{"design"}, "")
 	if err != nil {
 		t.Fatalf("listBookmarks disjoint: %v", err)
 	}
 	if len(none) != 0 {
 		t.Fatalf("tag search with a non-matching filter: got %d, want 0", len(none))
+	}
+}
+
+func TestListBookmarksSortOrders(t *testing.T) {
+	db := testDB(t)
+
+	// Titles are deliberately out of insertion order so an alphabetical run
+	// cannot pass by accidentally agreeing with the created_at order.
+	zebra, _, err := insertBookmark(db, "https://zebra.example/", "Zebra", "", []string{"go"}, 1000)
+	if err != nil {
+		t.Fatalf("insert zebra: %v", err)
+	}
+	apple, _, err := insertBookmark(db, "https://apple.example/", "apple", "", []string{"go"}, 2000)
+	if err != nil {
+		t.Fatalf("insert apple: %v", err)
+	}
+	// Empty title: the card prints the url, so the alphabetical sort must too.
+	middle, _, err := insertBookmark(db, "https://middle.example/", "", "", []string{"go"}, 3000)
+	if err != nil {
+		t.Fatalf("insert middle: %v", err)
+	}
+
+	if err := recordVisit(db, zebra); err != nil {
+		t.Fatalf("visit zebra: %v", err)
+	}
+	if err := recordVisit(db, zebra); err != nil {
+		t.Fatalf("visit zebra again: %v", err)
+	}
+	if err := recordVisit(db, middle); err != nil {
+		t.Fatalf("visit middle: %v", err)
+	}
+
+	ids := func(bms []Bookmark) []int64 {
+		out := make([]int64, len(bms))
+		for i, bm := range bms {
+			out[i] = bm.ID
+		}
+		return out
+	}
+
+	cases := []struct {
+		sort string
+		want []int64
+	}{
+		{"recent", []int64{middle, apple, zebra}},
+		{"oldest", []int64{zebra, apple, middle}},
+		{"title", []int64{apple, middle, zebra}},
+		{"used", []int64{zebra, middle, apple}},
+		// Unknown and empty both fall back to the default rather than erroring.
+		{"", []int64{middle, apple, zebra}},
+		{"'; DROP TABLE bookmarks; --", []int64{middle, apple, zebra}},
+	}
+
+	for _, tc := range cases {
+		got, err := listBookmarks(db, "", nil, tc.sort)
+		if err != nil {
+			t.Fatalf("list sort=%q: %v", tc.sort, err)
+		}
+		if !reflect.DeepEqual(ids(got), tc.want) {
+			t.Errorf("sort=%q: got ids %v, want %v", tc.sort, ids(got), tc.want)
+		}
+		// The tag-filtered branch builds its own query string, so it needs the
+		// same coverage: an ORDER BY applied to only one of the two is a bug
+		// that shows up the moment a tag is selected.
+		filtered, err := listBookmarks(db, "", []string{"go"}, tc.sort)
+		if err != nil {
+			t.Fatalf("list filtered sort=%q: %v", tc.sort, err)
+		}
+		if !reflect.DeepEqual(ids(filtered), tc.want) {
+			t.Errorf("filtered sort=%q: got ids %v, want %v", tc.sort, ids(filtered), tc.want)
+		}
 	}
 }
