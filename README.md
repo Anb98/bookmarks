@@ -1,34 +1,43 @@
 # Bookmarks
 
-A self-hosted bookmarks manager in a single static binary. Paste a URL and the server fetches the page to fill in the title, description and favicon for you; find anything again by live search or by combining tags. Data lives in one SQLite file on your host, so backing it up means copying one file.
+A self-hosted bookmarks manager in a single 5.5 MB static binary. Paste a URL and the server fetches the page to fill in the title, description and favicon; find anything again by live search or by combining tags. All data lives in one SQLite file on your host.
 
-No authentication, by design. This is built for a machine you control on a network you trust — see [Security](#security) before exposing it.
+![Bookmarks](docs/desktop-light.png)
 
-## Quick path
+<details>
+<summary>More screenshots — dark theme, the entry drawer, mobile</summary>
 
-You do not need to clone this repository. [`docker-compose.yml`](docker-compose.yml) is self-contained — save that one file somewhere and run:
+![Dark theme](docs/desktop-dark.png)
+
+![Entry drawer with inferred metadata](docs/drawer.png)
+
+![Mobile layout](docs/mobile.png)
+
+</details>
+
+## Features
+
+- **Metadata inference** — paste a URL, the server fetches the page for title, description and favicon. Everything stays editable.
+- **Live search** across title, URL, description and tags at once.
+- **Tag filtering** — tags combine with AND, sized by how often you use them.
+- **Import/export** — JSON, or a browser's `bookmarks.html`. Folders become tags.
+- **No build step, no JavaScript framework, no external requests.** Fonts and UI ship inside the binary.
+- **Multi-arch** — `linux/amd64` and `linux/arm64`.
+
+## Installation
+
+You do not need to clone this repository. [`docker-compose.yml`](docker-compose.yml) is self-contained — save that one file and run:
 
 ```bash
 mkdir -p data
 docker compose up -d
 ```
 
-That pulls the published multi-arch image (`linux/amd64` and `linux/arm64`) from GitHub Container Registry, so nothing is compiled on your machine. Open <http://localhost:8080>.
+Open <http://localhost:8080>.
 
-Create `data/` yourself, before the first start. If you let Docker create it, the directory ends up owned by root, the unprivileged container cannot write to it, and the app restarts forever logging `unable to open database file`.
+> **Create `data/` yourself, before the first start.** If you let Docker create it, the directory ends up owned by root, the unprivileged container cannot write to it, and the app restart-loops on `unable to open database file`.
 
-To verify it worked:
-
-```bash
-curl -s localhost:8080/healthz     # -> ok
-ls data/                           # -> bookmarks.db (plus -wal and -shm)
-```
-
-Change the published port with `BOOKMARKS_PORT=9000 docker compose up -d`.
-
-### The one thing that trips people up
-
-The container writes SQLite to a bind-mounted directory, so its user has to be able to write there. `docker-compose.yml` defaults to `1000:1000`. If your account is not uid 1000:
+The container runs as `1000:1000`, which must match the owner of `data/`. If `id -u` says otherwise:
 
 ```bash
 echo "UID=$(id -u)" >> .env
@@ -36,28 +45,26 @@ echo "GID=$(id -g)" >> .env
 docker compose up -d
 ```
 
-Get this wrong and the container exits at startup saying it cannot open the database. That is deliberate: the alternative is running as root and leaving root-owned files on your host that you then cannot read without `sudo`.
+Change the published port with `BOOKMARKS_PORT=9000 docker compose up -d`.
 
-### Building it yourself
-
-Compose consumes the published image, so there is no build context in `docker-compose.yml`. To run your own build, tag it with the name compose already expects and it will be used instead of the registry copy:
+### Without compose
 
 ```bash
-docker build -t ghcr.io/anb98/bookmarks:latest .
-docker compose up -d
+mkdir -p data
+docker run -d --name bookmarks --restart unless-stopped \
+  -p 8080:8080 -u "$(id -u):$(id -g)" -v "$PWD/data:/data" \
+  ghcr.io/anb98/bookmarks:latest
 ```
-
-To go back to the published image, `docker compose pull` overwrites that tag again. `:latest` follows `main`; pin the commit tag `ghcr.io/anb98/bookmarks:<sha>` in `docker-compose.yml` if you would rather choose when to move.
 
 ## Configuration
 
-Every setting is an environment variable, and the app starts with none of them set.
+Every setting is an environment variable. The app starts with none of them set.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `BOOKMARKS_ADDR` | `:8080` | Listen address inside the container |
 | `BOOKMARKS_DB` | `/data/bookmarks.db` | SQLite file. WAL sidecars land beside it |
-| `BOOKMARKS_THEME` | `dark` | Initial theme (`light` or `dark`) for a browser with no saved preference. Rejected at startup if it is anything else |
+| `BOOKMARKS_THEME` | `dark` | Initial theme (`light` or `dark`) for a browser with no saved preference |
 | `BOOKMARKS_ALLOW_PRIVATE_NET` | `false` | Allow metadata fetches to private/internal addresses. See [Security](#security) |
 | `BOOKMARKS_FETCH_TIMEOUT` | `8s` | Timeout for one outbound metadata fetch |
 | `BOOKMARKS_MAX_FETCH_BYTES` | `1048576` | Cap on a fetched page (1 MiB) |
@@ -65,29 +72,43 @@ Every setting is an environment variable, and the app starts with none of them s
 | `BOOKMARKS_MAX_IMPORT_BYTES` | `33554432` | Cap on an import upload (32 MiB) |
 | `BOOKMARKS_USER_AGENT` | `Mozilla/5.0 (compatible; bookmarks/1.0)` | Some sites reject the default Go user agent |
 
-The redirect cap (5 hops) is a constant, not a variable. It never needs tuning.
-
-## Using it
+## Usage
 
 | Action | How |
 |---|---|
 | Add a bookmark | `NEW`, paste a URL. Title and description fill in on their own and stay editable — whatever you type wins |
 | Tag it | Type in the tag field. `MOST USED` shows existing tags; no match offers `+ create` |
 | Search | Type in the search row. Matches title, URL, description and tags at once |
-| Filter | Click tags in the band. Multiple tags combine with **AND** — a bookmark must carry all of them |
-| Show the tags | Below 1024px the band starts collapsed to save vertical space. **Tap anywhere on the `TAGS` strip** to expand it — the whole strip is the control, not just `SHOW ALL` |
-| Open a bookmark | Click the card. It is a real link, so middle-click and "open in new tab" work as expected |
-| Edit or delete | Click the **pencil** at the card's corner — present at every width. `DELETE ENTRY` is permanent, with no trash |
-| Export | `EXPORT` downloads the whole collection as JSON |
-| Import | `IMPORT` accepts that JSON **or** a browser's `bookmarks.html` |
+| Filter | Click tags in the band. Multiple tags combine with **AND** |
+| Show the tags | Below 1024px the band starts collapsed. Tap anywhere on the `TAGS` strip to expand it |
+| Open a bookmark | Click the card. It is a real link, so middle-click and "open in new tab" work |
+| Edit or delete | Click the **pencil** at the card's corner. `DELETE ENTRY` is permanent |
+| Import / export | `EXPORT` writes JSON. `IMPORT` accepts that JSON **or** a browser's `bookmarks.html` |
 
-### Import behaviour
+Import matches on URL and updates rather than duplicating: title and description are filled only if empty, tags are merged, and one bad row is skipped rather than failing the file. Browser folders become tags, with each nesting level contributing one (`Work > Clients > Acme` yields three) and generic containers like `Bookmarks bar` skipped. **Import never fetches metadata** — a 500-row import would otherwise fire 500 outbound requests.
 
-Import matches on URL and updates rather than duplicating. Title and description are only filled if currently empty; tags are merged. One bad row is skipped and reported, not fatal. A file that is not valid JSON or HTML is rejected without writing anything.
+## Updating
 
-Browser bookmark folders become tags, since folders are the taxonomy you already built. Nesting contributes each level (`Work > Clients > Acme` yields three tags), and generic container names (`Bookmarks bar`, `Favorites`, `Other bookmarks`, and similar) are skipped.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-**Import never fetches metadata.** A 500-row import would otherwise fire 500 outbound requests. Imported rows keep whatever the file gave them and show a monogram tile until you edit them.
+`:latest` follows `main`. To decide yourself when to move, pin a commit tag in `docker-compose.yml`:
+
+```yaml
+image: ghcr.io/anb98/bookmarks:<sha>
+```
+
+## Backup
+
+The whole collection is one file:
+
+```bash
+cp data/bookmarks.db backup.db
+```
+
+Do it while the app is stopped, or use `sqlite3 data/bookmarks.db ".backup backup.db"` to include the WAL safely. `EXPORT` in the UI writes portable JSON if you would rather not copy the database.
 
 ## Security
 
@@ -97,9 +118,9 @@ There is no login, and anyone who can reach the port has full read and write acc
 
 ### SSRF is the real risk here
 
-The metadata endpoint makes the **server** fetch a URL **you** supply. Combined with no authentication, anyone who can reach this app could otherwise use it to probe services that are only reachable from the server — cloud metadata endpoints, admin panels on localhost, devices on your LAN.
+The metadata endpoint makes the **server** fetch a URL **you** supply. Combined with no authentication, anyone who can reach this app could otherwise use it to probe services only reachable from the server — cloud metadata endpoints, admin panels on localhost, devices on your LAN.
 
-By default, fetches to these are refused:
+Fetches to these are refused by default:
 
 - loopback (`127.0.0.0/8`, `::1`)
 - private ranges (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`)
@@ -109,9 +130,9 @@ By default, fetches to these are refused:
 - multicast and unspecified addresses
 - any scheme other than `http` and `https`
 
-Two details matter more than the list. The check runs against the **resolved IP**, not the hostname, so a domain pointed at `127.0.0.1` is still refused. And it re-runs on **every redirect hop**, so a public URL that redirects to an internal one dies on the second hop.
+Two details matter more than the list. The check runs against the **resolved IP**, not the hostname, so a domain pointed at `127.0.0.1` is still refused. And it re-runs on **every redirect hop**, so a public URL redirecting to an internal one dies on the second hop.
 
-Set `BOOKMARKS_ALLOW_PRIVATE_NET=true` only if you deliberately want to bookmark internal pages and understand that it removes this protection. Saving a bookmark never required the fetch to succeed, so you can always add an internal URL by hand and type its title yourself.
+`BOOKMARKS_ALLOW_PRIVATE_NET=true` removes this protection. Saving a bookmark never required the fetch to succeed, so you can add an internal URL by hand and type its title yourself instead.
 
 ### Other measures
 
@@ -119,7 +140,7 @@ Set `BOOKMARKS_ALLOW_PRIVATE_NET=true` only if you deliberately want to bookmark
 |---|---|
 | Stored titles rendered in the page | The frontend never uses `innerHTML`; all text goes through `textContent` |
 | Favicons as an attack vector | Served only with an allowlisted image type, plus `nosniff` and `default-src 'none'; sandbox` |
-| Third-party favicon services | None used. Only the site's own declared icon or `/favicon.ico`. If neither yields a real image, nothing is stored and a monogram renders |
+| Third-party favicon services | None used. Only the site's own declared icon or `/favicon.ico` |
 | Oversized or slow responses | Timeout, byte cap, and a 5-hop redirect limit on every fetch |
 | Import uploads | 32 MiB cap, per-row error collection, no outbound requests |
 
@@ -127,7 +148,18 @@ Set `BOOKMARKS_ALLOW_PRIVATE_NET=true` only if you deliberately want to bookmark
 
 Keyboard navigation and focus rings work throughout, and tag pills expose their frequency to screen readers (`"go, 6 bookmarks"`) because it is conveyed visually by size and brightness alone.
 
-**One documented exception.** In the tag cloud, low-frequency tags are deliberately rendered dim and small — that contrast difference *is* the information channel, encoding how often each tag is used. Raising those tones to meet WCAG AA would erase the signal. This is a considered trade-off confined to the least important content on the page, not an oversight. Every other text tone, and the accent used for buttons and links, meets AA (4.5:1 or better).
+**One documented exception.** In the tag cloud, low-frequency tags are deliberately dim and small — that contrast difference *is* the information channel. Raising those tones to meet WCAG AA would erase the signal. This is a considered trade-off confined to the least important content on the page. Every other text tone, and the accent used for buttons and links, meets AA (4.5:1 or better).
+
+## Building from source
+
+Compose consumes the published image, so `docker-compose.yml` has no build context. To run your own build, tag it with the name compose already expects:
+
+```bash
+docker build -t ghcr.io/anb98/bookmarks:latest .
+docker compose up -d
+```
+
+`docker compose pull` overwrites that tag again with the published image.
 
 ## Development
 
@@ -139,18 +171,8 @@ gofmt -l .
 BOOKMARKS_DB=/tmp/dev.db BOOKMARKS_ADDR=:8080 go run .
 ```
 
-Two dependencies: `modernc.org/sqlite` (pure Go, so the binary is genuinely static) and `golang.org/x/net/html` (for parsing untrusted remote HTML). The frontend is three hand-written files with no build step, no npm, and no framework, embedded into the binary with `go:embed` along with the fonts — the app makes no external network requests to render.
+Two dependencies: `modernc.org/sqlite` (pure Go, so the binary is genuinely static and cross-compiles to arm64 without a C toolchain) and `golang.org/x/net/html` (for parsing untrusted remote HTML).
 
-### Why a scratch image
+The frontend is native ES modules under `web/js/`, plus `web/index.html` and `web/app.css` — no build step, no npm, no framework. Everything, fonts included, is embedded with `go:embed`, so the app makes no external requests to render.
 
-| Stack | Base image floor, measured |
-|---|---|
-| **Go static + `scratch`** | **12.09 MB — the entire shipped image** |
-| python:3.13-alpine | 70.3 MB before any application code |
-| node:24-alpine | 234 MB before any application code |
-
-Measure the built image with `docker history`, or `docker image inspect --format '{{.Size}}'` for the compressed size (~5.45 MB). Do not trust `docker images`, which reports inflated numbers for this image.
-
-### Design artifacts
-
-The frozen visual specification (the `*.dc.html` artboards and their supporting files) was removed once `web/` reproduced it. `go:embed` takes `web/` only, so the shipped UI is `web/index.html`, `web/app.css`, `web/app.js` and `web/fonts/`.
+The `scratch` base is what keeps the image at 5.5 MB; `python:3.13-alpine` starts at 70.3 MB and `node:24-alpine` at 234 MB before any application code. Measure with `docker image inspect --format '{{.Size}}'` — `docker images` reports inflated numbers for this image.

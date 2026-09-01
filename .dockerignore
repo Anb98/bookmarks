@@ -2,3 +2,4 @@
 data/
 *_test.go
 *.md
+docs/
