@@ -176,3 +176,7 @@ Two dependencies: `modernc.org/sqlite` (pure Go, so the binary is genuinely stat
 The frontend is native ES modules under `web/js/`, plus `web/index.html` and `web/app.css` — no build step, no npm, no framework. Everything, fonts included, is embedded with `go:embed`, so the app makes no external requests to render.
 
 The `scratch` base is what keeps the image at 5.5 MB; `python:3.13-alpine` starts at 70.3 MB and `node:24-alpine` at 234 MB before any application code. Measure with `docker image inspect --format '{{.Size}}'` — `docker images` reports inflated numbers for this image.
+
+## License
+
+[MIT](LICENSE)
