@@ -1,22 +1,12 @@
-# Bookmarks — a self-hosted bookmarks manager in a single static binary.
-# https://github.com/Anb98/bookmarks
+# Bookmarks — https://github.com/Anb98/bookmarks
 #
-# This file is all you need. There is nothing to clone and nothing to build:
-# save it somewhere, then run
+#   mkdir -p data && docker compose up -d
 #
-#     mkdir -p data
-#     docker compose up -d
-#
-# and open http://localhost:8080
-#
-# Create ./data yourself, before the first start. If you let Docker create it,
-# it ends up owned by root, the unprivileged container cannot write there, and
-# the app restarts forever logging "unable to open database file".
+# Create data/ yourself first. If Docker creates it, it is owned by root and
+# the container cannot write the database.
 
 services:
   bookmarks:
-    # Multi-arch (linux/amd64 and linux/arm64), rebuilt on every push to main.
-    # Replace :latest with a commit sha to decide yourself when to move.
     image: ghcr.io/anb98/bookmarks:latest
     container_name: bookmarks
     restart: unless-stopped
@@ -24,14 +14,9 @@ services:
     ports:
       - "${BOOKMARKS_PORT:-8080}:8080"
 
-    # Must match the owner of ./data on the host, or SQLite cannot write there.
-    # 1000:1000 is the usual first account. If `id -u` says otherwise, write
-    # UID= and GID= into a .env file next to this one.
+    # Must match the owner of ./data. Override in a .env file next to this one.
     user: "${UID:-1000}:${GID:-1000}"
 
-    # The database lives here. This bind mount is required, not optional:
-    # without it the container has no writable /data and will exit at startup.
-    # Backing up is copying data/bookmarks.db.
     volumes:
       - ./data:/data
 
@@ -39,10 +24,6 @@ services:
       BOOKMARKS_ADDR: ":8080"
       BOOKMARKS_DB: "/data/bookmarks.db"
       BOOKMARKS_THEME: "dark"
-
-      # The server fetches the pages you save to infer their metadata. Leave
-      # this false unless you also want it reaching hosts on your private
-      # network, which would let a saved URL probe your LAN.
       BOOKMARKS_ALLOW_PRIVATE_NET: "false"
       BOOKMARKS_FETCH_TIMEOUT: "8s"
       BOOKMARKS_MAX_FETCH_BYTES: "1048576"
