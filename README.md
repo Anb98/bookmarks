@@ -6,12 +6,16 @@ No authentication, by design. This is built for a machine you control on a netwo
 
 ## Quick path
 
+You do not need to clone this repository. [`docker-compose.yml`](docker-compose.yml) is self-contained — save that one file somewhere and run:
+
 ```bash
 mkdir -p data
 docker compose up -d
 ```
 
-That pulls the published multi-arch image (`linux/amd64` and `linux/arm64`) from GitHub Container Registry — nothing is compiled on your machine. Open <http://localhost:8080>.
+That pulls the published multi-arch image (`linux/amd64` and `linux/arm64`) from GitHub Container Registry, so nothing is compiled on your machine. Open <http://localhost:8080>.
+
+Create `data/` yourself, before the first start. If you let Docker create it, the directory ends up owned by root, the unprivileged container cannot write to it, and the app restarts forever logging `unable to open database file`.
 
 To verify it worked:
 
