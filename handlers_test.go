@@ -521,6 +521,55 @@ func TestHandlerMetadataFaviconSoftHTMLPageStoresNothing(t *testing.T) {
 	}
 }
 
+// TestHandlerMetadataBlockedPageStillStoresFavicon covers anti-bot sites
+// (WAF challenges, login walls) that refuse the page but serve /favicon.ico.
+func TestHandlerMetadataBlockedPageStillStoresFavicon(t *testing.T) {
+	app, db := testAppAllowPrivate(t)
+	server := httptest.NewServer(app.Routes())
+	defer server.Close()
+
+	png := []byte("\x89PNG\r\n\x1a\nrest-of-image")
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/favicon.ico" {
+			w.Write(png)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer target.Close()
+
+	payload := `{"url":"` + target.URL + `/page"}`
+	resp, err := http.Post(server.URL+"/api/metadata", "application/json", strings.NewReader(payload))
+	if err != nil {
+		t.Fatalf("POST metadata: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var out struct {
+		Title      string `json:"title"`
+		HasIcon    bool   `json:"has_icon"`
+		FetchError string `json:"fetch_error"`
+	}
+	decodeJSON(t, resp, &out)
+	if out.FetchError == "" {
+		t.Error("expected fetch_error for a 403 page")
+	}
+	if out.Title != "" {
+		t.Errorf("title should be empty on fetch failure, got %q", out.Title)
+	}
+	if !out.HasIcon {
+		t.Error("has_icon should be true when /favicon.ico is a real image")
+	}
+	fv, ok, err := getFavicon(db, domainOf(target.URL))
+	if err != nil || !ok {
+		t.Fatalf("getFavicon: ok=%v err=%v, want a stored row", ok, err)
+	}
+	if fv.MIME != "image/png" {
+		t.Errorf("stored MIME = %q, want image/png", fv.MIME)
+	}
+}
+
 func TestHandlerMetadataMalformedURLReturns400(t *testing.T) {
 	app, _ := testApp(t, 1<<20)
 	server := httptest.NewServer(app.Routes())

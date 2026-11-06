@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -382,18 +383,21 @@ func (a *App) handleMetadata(w http.ResponseWriter, r *http.Request) {
 		maxBytes:     a.cfg.MaxFetchBytes,
 		userAgent:    a.cfg.UserAgent,
 	}
+	var md Metadata
 	pageBytes, err := fetchURL(r.Context(), pageCfg, normURL)
-	if err != nil {
-		resp.FetchError = err.Error()
-		writeJSON(w, http.StatusOK, resp)
-		return
+	if err == nil {
+		md, err = extractMetadata(bytes.NewReader(pageBytes))
 	}
-
-	md, err := extractMetadata(bytes.NewReader(pageBytes))
 	if err != nil {
 		resp.FetchError = err.Error()
-		writeJSON(w, http.StatusOK, resp)
-		return
+		// Anti-bot walls refuse the page but usually still serve /favicon.ico,
+		// so keep going; only a timed-out host is skipped, since it would just
+		// time out a second time on the favicon.
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			writeJSON(w, http.StatusOK, resp)
+			return
+		}
 	}
 	resp.Title = md.Title
 	resp.Description = md.Description
