@@ -570,6 +570,76 @@ func TestHandlerMetadataBlockedPageStillStoresFavicon(t *testing.T) {
 	}
 }
 
+// postMetadataIcon posts url to /api/metadata and returns has_icon plus the
+// stored favicon MIME ("" when no row was written).
+func postMetadataIcon(t *testing.T, serverURL, url string, db *sql.DB) (bool, string) {
+	t.Helper()
+	resp, err := http.Post(serverURL+"/api/metadata", "application/json", strings.NewReader(`{"url":"`+url+`"}`))
+	if err != nil {
+		t.Fatalf("POST metadata: %v", err)
+	}
+	var out struct {
+		HasIcon bool `json:"has_icon"`
+	}
+	decodeJSON(t, resp, &out)
+	fv, ok, err := getFavicon(db, domainOf(url))
+	if err != nil {
+		t.Fatalf("getFavicon: %v", err)
+	}
+	if !ok {
+		return out.HasIcon, ""
+	}
+	return out.HasIcon, fv.MIME
+}
+
+// TestHandlerMetadataRelativeIconResolvesAgainstRedirectedURL covers pages
+// like /app that redirect to /app/ and declare ./icon.png: the icon lives
+// under /app/, not at the root.
+func TestHandlerMetadataRelativeIconResolvesAgainstRedirectedURL(t *testing.T) {
+	app, db := testAppAllowPrivate(t)
+	server := httptest.NewServer(app.Routes())
+	defer server.Close()
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/app":
+			http.Redirect(w, r, "/app/", http.StatusMovedPermanently)
+		case "/app/":
+			w.Write([]byte(`<html><head><title>App</title><link rel="icon" href="./icon.png"></head></html>`))
+		case "/app/icon.png":
+			w.Write([]byte("\x89PNG\r\n\x1a\nrest-of-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer target.Close()
+
+	hasIcon, mimeType := postMetadataIcon(t, server.URL, target.URL+"/app", db)
+	if !hasIcon || mimeType != "image/png" {
+		t.Errorf("has_icon=%v stored MIME=%q, want true and image/png", hasIcon, mimeType)
+	}
+}
+
+func TestHandlerMetadataBMPFaviconIsStored(t *testing.T) {
+	app, db := testAppAllowPrivate(t)
+	server := httptest.NewServer(app.Routes())
+	defer server.Close()
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/favicon.ico" {
+			w.Write([]byte("BM6\x03\x00\x00\x00\x00\x00\x006\x00\x00\x00"))
+			return
+		}
+		w.Write([]byte(`<html><head><title>No declared icon</title></head></html>`))
+	}))
+	defer target.Close()
+
+	hasIcon, mimeType := postMetadataIcon(t, server.URL, target.URL+"/", db)
+	if !hasIcon || mimeType != "image/bmp" {
+		t.Errorf("has_icon=%v stored MIME=%q, want true and image/bmp", hasIcon, mimeType)
+	}
+}
+
 func TestHandlerMetadataMalformedURLReturns400(t *testing.T) {
 	app, _ := testApp(t, 1<<20)
 	server := httptest.NewServer(app.Routes())

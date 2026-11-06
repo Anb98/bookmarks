@@ -302,6 +302,7 @@ var allowedFaviconMIMEs = map[string]bool{
 	"image/webp":    true,
 	"image/x-icon":  true,
 	"image/svg+xml": true,
+	"image/bmp":     true, // some old sites serve a raw BMP as favicon.ico
 }
 
 // detectFaviconMIME sniffs real image bytes only. SVG has no dedicated sniff
@@ -384,8 +385,10 @@ func (a *App) handleMetadata(w http.ResponseWriter, r *http.Request) {
 		userAgent:    a.cfg.UserAgent,
 	}
 	var md Metadata
-	pageBytes, err := fetchURL(r.Context(), pageCfg, normURL)
+	baseURL := normURL
+	pageBytes, finalURL, err := fetchURL(r.Context(), pageCfg, normURL)
 	if err == nil {
+		baseURL = finalURL
 		md, err = extractMetadata(bytes.NewReader(pageBytes))
 	}
 	if err != nil {
@@ -406,14 +409,14 @@ func (a *App) handleMetadata(w http.ResponseWriter, r *http.Request) {
 	if iconHref == "" {
 		iconHref = "/favicon.ico"
 	}
-	if iconURL, err := resolveURL(normURL, iconHref); err == nil {
+	if iconURL, err := resolveURL(baseURL, iconHref); err == nil {
 		faviconCfg := fetchConfig{
 			allowPrivate: a.cfg.AllowPrivateNet,
 			timeout:      a.cfg.FetchTimeout,
 			maxBytes:     a.cfg.MaxFaviconBytes,
 			userAgent:    a.cfg.UserAgent,
 		}
-		if iconBytes, ferr := fetchURL(r.Context(), faviconCfg, iconURL); ferr == nil && len(iconBytes) > 0 {
+		if iconBytes, _, ferr := fetchURL(r.Context(), faviconCfg, iconURL); ferr == nil && len(iconBytes) > 0 {
 			if mimeType := detectFaviconMIME(iconBytes); mimeType != "" {
 				if err := putFavicon(a.db, resp.Domain, mimeType, iconBytes, time.Now().Unix()); err == nil {
 					resp.HasIcon = true

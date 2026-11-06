@@ -142,7 +142,7 @@ func TestFetchURLEndToEndBlocksLoopback(t *testing.T) {
 		maxBytes:     1024,
 		userAgent:    "test-agent",
 	}
-	if _, err := fetchURL(context.Background(), cfg, server.URL); err == nil {
+	if _, _, err := fetchURL(context.Background(), cfg, server.URL); err == nil {
 		t.Fatal("expected fetchURL to refuse a loopback httptest server by default")
 	}
 }
@@ -159,7 +159,7 @@ func TestFetchURLEndToEndAllowsPrivateWhenConfigured(t *testing.T) {
 		maxBytes:     1024,
 		userAgent:    "test-agent",
 	}
-	body, err := fetchURL(context.Background(), cfg, server.URL)
+	body, _, err := fetchURL(context.Background(), cfg, server.URL)
 	if err != nil {
 		t.Fatalf("fetchURL: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestFetchURLCapsOversizedBody(t *testing.T) {
 		maxBytes:     100,
 		userAgent:    "test-agent",
 	}
-	body, err := fetchURL(context.Background(), cfg, server.URL)
+	body, _, err := fetchURL(context.Background(), cfg, server.URL)
 	if err != nil {
 		t.Fatalf("fetchURL: %v", err)
 	}

@@ -88,28 +88,30 @@ type fetchConfig struct {
 	userAgent    string
 }
 
-func fetchURL(ctx context.Context, cfg fetchConfig, rawURL string) ([]byte, error) {
+// fetchURL returns the body and the final URL after redirects, which is the
+// base that relative links in that body resolve against.
+func fetchURL(ctx context.Context, cfg fetchConfig, rawURL string) ([]byte, string, error) {
 	client := newFetchClient(cfg.allowPrivate, cfg.timeout)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req.Header.Set("User-Agent", cfg.userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("upstream returned status %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("upstream returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, cfg.maxBytes))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return body, nil
+	return body, resp.Request.URL.String(), nil
 }
